@@ -1,17 +1,13 @@
-[
-  {
-    "profileId": "tab_s9_plus_x810_local",
-    "models": ["SM-X810"],
-    "kernelVersions": ["5.15.189"],
-    "exploit": {
-      "url": "payload/cve-2026-43499-app.so",
-      "size": 104128,
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    "kernelSu": {
-      "url": "payload/cve-2026-43499-root",
-      "size": 6649032,
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+{
+  "schemaVersion": 3,
+  "payloads": [
+    {
+      "payloadId": "dm3q-X810ZCS6EZF1",
+      "displayName": "Galaxy Tab S9+ | Kernel 5.15.189",
+      "models": ["SM-X810"],
+      "kernelVersions": ["5.15.189"],
+      "exploit":  { "url": "payload/cve-2026-43499-app.so", "size": 124960 },
+      "kernelsu": { "url": "payload/ksud-dm3q-S9180ZHS8FZF5-kdp", "size": 4556352 }
     }
-  }
-]
+  ]
+}

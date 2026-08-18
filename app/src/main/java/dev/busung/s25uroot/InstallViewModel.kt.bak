@@ -167,7 +167,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
                 setPhase(InstallPhase.LoadingKernelSu, app.getString(R.string.status_ksu_loading))
                 installKernelSu(payloads)
-installKsuManagerIfNeeded()
+
                 setPhase(InstallPhase.Installed, app.getString(R.string.status_ksu_active))
                 appendLog(app.getString(R.string.log_install_complete))
                 finishHistory(InstallRunResult.Succeeded)
@@ -510,59 +510,4 @@ installKsuManagerIfNeeded()
 
         private fun stripAnsi(value: String): String = ANSI_ESCAPE.replace(value, "").replace("\r", "")
     }
-	
-	// 1. 检测是否已安装 KSU Manager
-private fun isKsuManagerInstalled(): Boolean {
-    return try {
-        // 注意：如果老白改了包名，把这里换成他的包名
-        app.packageManager.getPackageInfo("me.weishu.kernelsu", 0)
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-// 2. 通过 Shizuku 静默安装 APK
-private suspend fun installKsuManagerIfNeeded() {
-    if (isKsuManagerInstalled()) {
-        appendLog("[*] KernelSU Manager already installed, skipping.")
-        return
-    }
-
-    appendLog("[*] Installing KernelSU Manager 3.2.5 via Shizuku...")
-    try {
-        val tmpApkPath = "/data/local/tmp/ksu-manager.apk"
-        
-        // Step A: 用 Shizuku 起一个 shell，通过 stdin 把 assets 里的 apk 写到 /data/local/tmp
-        // (因为 shell 用户读不到 App 的沙箱目录，必须用管道写)
-        val writeCmd = arrayOf("/system/bin/sh", "-c", "cat > $tmpApkPath")
-        val writeProcess = ShizukuController.exec(writeCmd)
-        
-        app.assets.open("payload/KernelSU_Manager_v3.2.5_32525.apk").use { input ->
-            writeProcess.outputStream.use { output ->
-                input.copyTo(output)
-            }
-        }
-        val writeExit = writeProcess.waitFor()
-        if (writeExit != 0) throw RuntimeException("Failed to write APK to tmp")
-
-        // Step B: 执行 pm install 静默安装
-        val installCmd = arrayOf("/system/bin/sh", "-c", "pm install -r $tmpApkPath")
-        val installProcess = ShizukuController.exec(installCmd)
-        val installOutput = installProcess.inputStream.bufferedReader().readText()
-        val installExit = installProcess.waitFor()
-        
-        // Step C: 清理临时文件
-        ShizukuController.exec(arrayOf("/system/bin/sh", "-c", "rm -f $tmpApkPath")).waitFor()
-
-        if (installExit == 0 || installOutput.contains("Success")) {
-            appendLog("[+] KernelSU Manager installed successfully!")
-        } else {
-            appendLog("[-] pm install failed: $installOutput")
-        }
-    } catch (e: Exception) {
-        appendLog("[-] Failed to install KernelSU Manager: ${e.message}")
-    }
-}
-	
 }
