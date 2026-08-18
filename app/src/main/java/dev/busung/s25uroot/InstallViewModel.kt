@@ -184,6 +184,10 @@ installKsuManagerIfNeeded()
         val logFile = if (shizuku) File(SHIZUKU_LOG_PATH) else File(app.filesDir, "exploit.log")
         if (shizuku) {
             ShizukuController.exec(arrayOf("rm", "-f", SHIZUKU_LOG_PATH)).waitFor()
+    // 清除上次 panic/重启留下的零字节尸体，防 bad ELF magic
+    ShizukuController.exec(arrayOf("/system/bin/sh", "-c",
+        "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
+    )).waitFor()
         } else {
             logFile.delete()
         }
