@@ -179,7 +179,7 @@ installKsuManagerIfNeeded()
         }
     }
 
-    private suspend fun executeExploit(payload: File, attempts: String = EXPLOIT_ATTEMPTS) {
+    private suspend fun executeExploit(payload: File, attempts: String = EXPLOIT_ATTEMPTS, pselectDelay: String = "20000") {
         val shizuku = shizukuEnabled()
         val logFile = if (shizuku) File(SHIZUKU_LOG_PATH) else File(app.filesDir, "exploit.log")
         if (shizuku) {
