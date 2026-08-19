@@ -201,7 +201,7 @@ installKsuManagerIfNeeded()
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             ShizukuController.exec(
                 arrayOf("/system/bin/sh", "-c", "true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath),
+                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath,attemptsh),
             )
         } else {
             val processBuilder = ProcessBuilder(
@@ -212,7 +212,7 @@ installKsuManagerIfNeeded()
                 logFile.absolutePath,
             ).redirectErrorStream(true)
             processBuilder.environment().apply {
-                put("EXPLOIT_ATTEMPTS", EXPLOIT_ATTEMPTS)
+                put("EXPLOIT_ATTEMPTS", attempts)
                 put("P0_ATTEMPT_TIMEOUT_SEC", P0_ATTEMPT_TIMEOUT_SEC)
                 put("EXPLOIT_ATTEMPT_TIMEOUT_SEC", EXPLOIT_ATTEMPT_TIMEOUT_SEC)
                 cachedP0Offset(bootToken)?.let { put(P0_OFFSET_ENV, it) }
