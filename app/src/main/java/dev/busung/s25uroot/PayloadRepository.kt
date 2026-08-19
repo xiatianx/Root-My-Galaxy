@@ -37,13 +37,15 @@ class PayloadRepository(private val context: Context) {
         val directory = File(context.filesDir, "payloads/${profile.profileId}").apply { mkdirs() }
         val exploit = downloadArtifact(
             profile.exploit,
-            File(directory, "cve-2026-43499-app.so"),
+            //File(directory, "cve-2026-43499-app.so"),
+            File(directory, profile.exploit.url.substringAfterLast('/')),   // payload/cve-2026-43499 → cve-2026-43499
             context.getString(R.string.artifact_exploit),
             onProgress,
         )
         val kernelSu = downloadArtifact(
             profile.kernelSu,
-            File(directory, "ksud-s25u-kdp"),
+            //File(directory, "ksud-s25u-kdp"),
+            File(directory, profile.kernelSu.url.substringAfterLast('/')),  // → ksud-dm3q-S9
             context.getString(R.string.artifact_kernelsu),
             onProgress,
         )
