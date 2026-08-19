@@ -163,7 +163,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 appendLog(app.getString(R.string.log_download_verified))
 
                 setPhase(InstallPhase.Exploiting, app.getString(R.string.status_exploit_running))
-                executeExploit(payloads.exploit, payloads.profile.exploitAttempts.toString())
+                executeExploit(payloads.exploit, payloads.profile.exploitAttempts.toString(),payloads.profile.pselectDelayUsec.toString())
 
                 setPhase(InstallPhase.LoadingKernelSu, app.getString(R.string.status_ksu_loading))
                 installKernelSu(payloads)
@@ -201,7 +201,7 @@ installKsuManagerIfNeeded()
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             ShizukuController.exec(
                 arrayOf("/system/bin/sh", "-c", "true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath, attempts),
+                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath, attempts, pselectDelay),
             )
         } else {
             val processBuilder = ProcessBuilder(
@@ -212,7 +212,9 @@ installKsuManagerIfNeeded()
                 logFile.absolutePath,
             ).redirectErrorStream(true)
             processBuilder.environment().apply {
+                // 传递 attempts 和 pselectDelay 
                 put("EXPLOIT_ATTEMPTS", attempts)
+                put("PSELECT_DELAY_USEC", pselectDelay)
                 put("P0_ATTEMPT_TIMEOUT_SEC", P0_ATTEMPT_TIMEOUT_SEC)
                 put("EXPLOIT_ATTEMPT_TIMEOUT_SEC", EXPLOIT_ATTEMPT_TIMEOUT_SEC)
                 cachedP0Offset(bootToken)?.let { put(P0_OFFSET_ENV, it) }
@@ -404,8 +406,10 @@ installKsuManagerIfNeeded()
         payloadPath: String,
         helperPath: String,
 		attempts: String = EXPLOIT_ATTEMPTS,
+		pselectDelay: String = "20000"
     ): Array<String> = buildList {
         add("EXPLOIT_ATTEMPTS=$attempts")
+		add("PSELECT_DELAY_USEC=$pselectDelay") // 新增
         add("P0_ATTEMPT_TIMEOUT_SEC=$P0_ATTEMPT_TIMEOUT_SEC")
         add("EXPLOIT_ATTEMPT_TIMEOUT_SEC=$EXPLOIT_ATTEMPT_TIMEOUT_SEC")
         add("CVE43499_ROOT_HELPER=$helperPath")
