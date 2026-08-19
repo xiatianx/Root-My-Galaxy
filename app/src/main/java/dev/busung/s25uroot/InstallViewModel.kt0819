@@ -163,7 +163,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 appendLog(app.getString(R.string.log_download_verified))
 
                 setPhase(InstallPhase.Exploiting, app.getString(R.string.status_exploit_running))
-                executeExploit(payloads.exploit, payloads.profile.exploitAttempts.toString())
+                executeExploit(payloads.exploit)
 
                 setPhase(InstallPhase.LoadingKernelSu, app.getString(R.string.status_ksu_loading))
                 installKernelSu(payloads)
@@ -179,7 +179,7 @@ installKsuManagerIfNeeded()
         }
     }
 
-    private suspend fun executeExploit(payload: File,attempts: String = EXPLOIT_ATTEMPTS) {
+    private suspend fun executeExploit(payload: File) {
         val shizuku = shizukuEnabled()
         val logFile = if (shizuku) File(SHIZUKU_LOG_PATH) else File(app.filesDir, "exploit.log")
         if (shizuku) {
@@ -403,9 +403,8 @@ installKsuManagerIfNeeded()
         bootToken: String?,
         payloadPath: String,
         helperPath: String,
-		attempts: String = EXPLOIT_ATTEMPTS,
     ): Array<String> = buildList {
-        add("EXPLOIT_ATTEMPTS=$attempts")
+        add("EXPLOIT_ATTEMPTS=$EXPLOIT_ATTEMPTS")
         add("P0_ATTEMPT_TIMEOUT_SEC=$P0_ATTEMPT_TIMEOUT_SEC")
         add("EXPLOIT_ATTEMPT_TIMEOUT_SEC=$EXPLOIT_ATTEMPT_TIMEOUT_SEC")
         add("CVE43499_ROOT_HELPER=$helperPath")
