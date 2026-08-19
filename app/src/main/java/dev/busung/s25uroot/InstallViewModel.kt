@@ -179,7 +179,7 @@ installKsuManagerIfNeeded()
         }
     }
 
-    private suspend fun executeExploit(payload: File,attempts: String = EXPLOIT_ATTEMPTS) {
+    private suspend fun executeExploit(payload: File, attempts: String = EXPLOIT_ATTEMPTS) {
         val shizuku = shizukuEnabled()
         val logFile = if (shizuku) File(SHIZUKU_LOG_PATH) else File(app.filesDir, "exploit.log")
         if (shizuku) {
@@ -201,7 +201,7 @@ installKsuManagerIfNeeded()
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             ShizukuController.exec(
                 arrayOf("/system/bin/sh", "-c", "true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath,attemptsh),
+                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath, attempts),
             )
         } else {
             val processBuilder = ProcessBuilder(
@@ -486,36 +486,6 @@ installKsuManagerIfNeeded()
 
     private fun File.readTextIfPresent(): String = if (exists()) readText() else ""
 
-    companion object {
-        private const val EXPLOIT_ATTEMPTS = "24"
-        private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
-        private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
-        private const val EXPLOIT_STALL_MILLIS = 90_000L
-        private const val EXPLOIT_TOTAL_MILLIS = 900_000L
-        private const val INSTALL_RECEIPT = "install_receipt"
-        private const val RECEIPT_BOOT_TOKEN = "kernel_boot_id"
-        private const val RECEIPT_VERIFIED = "verified"
-        private const val P0_CACHE = "p0_cache"
-        private const val P0_CACHE_BOOT_TOKEN = "kernel_boot_id"
-        private const val P0_CACHE_OFFSET = "offset"
-        private const val P0_OFFSET_ENV = "SLIDE_P0_OFFSET"
-        private const val P0_OFFSET_MAX = 0x1f0000L
-        private const val P0_OFFSET_MASK = 0xffffL
-        private const val SHIZUKU_LOG_PATH = "/data/local/tmp/ksu-exploit.log"
-        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/ksu-helper"
-        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/ksu-payload"
-        private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
-        private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
-        private val LOG_POLL_INTERVAL = 250.milliseconds
-        private val SHIZUKU_LOG_POLL_INTERVAL = 1.seconds
-        private val ANSI_ESCAPE = Regex("\u001B\\[[0-?]*[ -/]*[@-~]")
-        private val P0_OFFSET_PATTERN = Regex(
-            "slide-kaslr-ok[^\\n]*slide=([0-9a-fA-F]{16})",
-        )
-
-        private fun stripAnsi(value: String): String = ANSI_ESCAPE.replace(value, "").replace("\r", "")
-    }
-	
 	// 1. 检测是否已安装 KSU Manager
 private fun isKsuManagerInstalled(): Boolean {
     return try {
@@ -570,4 +540,33 @@ private suspend fun installKsuManagerIfNeeded() {
     }
 }
 	
+    companion object {
+        private const val EXPLOIT_ATTEMPTS = "24"
+        private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
+        private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
+        private const val EXPLOIT_STALL_MILLIS = 90_000L
+        private const val EXPLOIT_TOTAL_MILLIS = 900_000L
+        private const val INSTALL_RECEIPT = "install_receipt"
+        private const val RECEIPT_BOOT_TOKEN = "kernel_boot_id"
+        private const val RECEIPT_VERIFIED = "verified"
+        private const val P0_CACHE = "p0_cache"
+        private const val P0_CACHE_BOOT_TOKEN = "kernel_boot_id"
+        private const val P0_CACHE_OFFSET = "offset"
+        private const val P0_OFFSET_ENV = "SLIDE_P0_OFFSET"
+        private const val P0_OFFSET_MAX = 0x1f0000L
+        private const val P0_OFFSET_MASK = 0xffffL
+        private const val SHIZUKU_LOG_PATH = "/data/local/tmp/ksu-exploit.log"
+        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/ksu-helper"
+        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/ksu-payload"
+        private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
+        private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
+        private val LOG_POLL_INTERVAL = 250.milliseconds
+        private val SHIZUKU_LOG_POLL_INTERVAL = 1.seconds
+        private val ANSI_ESCAPE = Regex("\u001B\\[[0-?]*[ -/]*[@-~]")
+        private val P0_OFFSET_PATTERN = Regex(
+            "slide-kaslr-ok[^\\n]*slide=([0-9a-fA-F]{16})",
+        )
+
+        private fun stripAnsi(value: String): String = ANSI_ESCAPE.replace(value, "").replace("\r", "")
+    }
 }
