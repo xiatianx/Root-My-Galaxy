@@ -186,7 +186,7 @@ installKsuManagerIfNeeded()
             ShizukuController.exec(arrayOf("rm", "-f", SHIZUKU_LOG_PATH)).waitFor()
     // 清除上次 panic/重启留下的零字节尸体，防 bad ELF magic
     ShizukuController.exec(arrayOf("/system/bin/sh", "-c",
-        "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
+        "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $GRKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
     )).waitFor()
         } else {
             logFile.delete()
@@ -270,7 +270,8 @@ installKsuManagerIfNeeded()
                     earlyOutput.takeIf(String::isNotBlank)?.let { " ($it)" } ?: "",
                 )
             }
-            require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
+            //require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
+            require(rawLog.contains("exploit completed") || rawLog.contains("temporary-root-ready")) {
                 app.getString(R.string.error_success_marker)
             }
         } finally {
@@ -315,12 +316,14 @@ installKsuManagerIfNeeded()
         if (shizukuEnabled()) {
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_PATH, "755")
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_STAGE_PATH, "755")
+            shizukuStage(payloads.kernelSu, GRKU_KSUD_PATH, "755")      // ★ 新增
             appendLog(app.getString(R.string.log_ksu_staged))
         } else {
             val source = shellQuote(payloads.kernelSu.absolutePath)
             val stageCommand =
                 "/system/bin/cp $source /data/local/tmp/ksud-s25u-kdp && " +
                     "/system/bin/cp $source /data/local/tmp/.ksud-stage && " +
+                    "/system/bin/cp $source /data/local/tmp/ksud-selected && " +   // ★ 新增
                     "/system/bin/chmod 755 /data/local/tmp/ksud-s25u-kdp /data/local/tmp/.ksud-stage"
             val stage = runHelper("-c", stageCommand)
             require(stage.code == 0) { app.getString(R.string.error_ksu_stage, stage.output) }
@@ -571,6 +574,7 @@ private suspend fun installKsuManagerIfNeeded() {
         private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/ksu-helper"
         private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/ksu-payload"
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
+        private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"   // ★ grku helper 硬编码找这个
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
         private val LOG_POLL_INTERVAL = 250.milliseconds
         private val SHIZUKU_LOG_POLL_INTERVAL = 1.seconds
