@@ -635,8 +635,8 @@ private suspend fun installKsuManagerIfNeeded() {
         private const val P0_OFFSET_MAX = 0x1f0000L
         private const val P0_OFFSET_MASK = 0xffffL
         private const val SHIZUKU_LOG_PATH = "/data/local/tmp/ksu-exploit.log"
-        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/ksu-helper"
-        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/ksu-payload"
+        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
+        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/cve-2026-43499"
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
         private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"   // ★ grku helper 硬编码找这个
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
