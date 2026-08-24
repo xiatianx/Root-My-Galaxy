@@ -241,9 +241,10 @@ installKsuManagerIfNeeded()
         }
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
+            val stagedHelper = shizukuStage(helper, SHIZUKU_HELPER_PATH, "755")
             ShizukuController.exec(
-                arrayOf("/system/bin/sh", "-c", "true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath, attempts, pselectDelay),
+                arrayOf("/system/bin/true"),
+                shizukuEnvironment(bootToken, stagedPayload.absolutePath, stagedHelper.absolutePath, attempts, pselectDelay),
             )
         } else {
             val processBuilder = ProcessBuilder(
