@@ -618,10 +618,10 @@ private suspend fun installKsuManagerIfNeeded() {
 }
 	
     companion object {
-        private const val EXPLOIT_ATTEMPTS = "24"
+        private const val EXPLOIT_ATTEMPTS = "6"
         private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
         private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
-        private const val EXPLOIT_STALL_MILLIS = 90_000L
+        private const val EXPLOIT_STALL_MILLIS = 210_000L
         private const val EXPLOIT_TOTAL_MILLIS = 900_000L
         private const val HELPER_TIMEOUT_MILLIS = 120_000L
         private const val INSTALL_RECEIPT = "install_receipt"
