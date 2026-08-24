@@ -242,9 +242,6 @@ installKsuManagerIfNeeded()
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             val stagedHelper = shizukuStage(helper, SHIZUKU_HELPER_PATH, "755")
-            // 兼容旧 ksu-* 路径（helper 自校验曾卡 ksu-helper）
-            shizukuStage(payload, "/data/local/tmp/ksu-payload", "755")
-            shizukuStage(helper, "/data/local/tmp/ksu-helper", "755")
             ShizukuController.exec(
                 arrayOf("/system/bin/true"),
                 shizukuEnvironment(bootToken, stagedPayload.absolutePath, stagedHelper.absolutePath, attempts, pselectDelay),
