@@ -8,7 +8,7 @@
       "kernelVersions": ["5.15.189"],
       "exploitAttempts": 24,
       "pselectDelayUsec": 20000,
-      "exploit":  { "url": "payload/cve-2026-43499-app.so", "size": 124960 },
+      "exploit":  { "url": "payload/cve-2026-43499", "size": 124960 },
       "kernelsu": { "url": "payload/ksud-dm3q-S9180ZHS8FZF5-kdp", "size": 4556352 }
     }
   ]

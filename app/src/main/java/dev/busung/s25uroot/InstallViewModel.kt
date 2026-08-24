@@ -197,6 +197,14 @@ installKsuManagerIfNeeded()
         }
         val logPrefix = mutableState.value.log
         val bootToken = currentBootToken()
+        // ★ 新增:独立预热步骤,注意【没有】第二个 env 参数 → 干净环境,只热缓存不触发 payload
+        if (shizuku) {
+            appendLog("[*] warmup 400x /system/bin/true")
+            ShizukuController.exec(
+                arrayOf("/system/bin/sh", "-c",
+                    "i=0; while [ \$i -lt 400 ]; do /system/bin/true; i=\$((\$i+1)); done")
+            ).waitFor()
+        }
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             ShizukuController.exec(
