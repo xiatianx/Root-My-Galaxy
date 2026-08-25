@@ -252,6 +252,20 @@ installKsuManagerIfNeeded()
                 drainProcessOutput(bootProc, bootBuf)
                 appendLog("[*] Shizuku boot_id: ${bootBuf.toString().trim().take(80)}")
                 appendLog("[*] Shizuku helper staged: $SHIZUKU_HELPER_PATH / $SHIZUKU_PAYLOAD_PATH")
+                // 额外探针：ashmem/tracefs/perf/bpf
+                for (probe in listOf(
+                    arrayOf("ls", "-l", "/dev/ashmem"),
+                    arrayOf("cat", "/proc/self/mountinfo"),
+                    arrayOf("ls", "-l", "/sys/kernel/tracing/tracing_on")
+                )) {
+                    try {
+                        val p = ShizukuController.exec(probe)
+                        val b = StringBuilder()
+                        while (p.isAlive) { drainProcessOutput(p, b); delay(50) }
+                        drainProcessOutput(p, b)
+                        appendLog("[*] Shizuku ${probe.joinToString(" ")}: ${b.toString().trim().take(120)}")
+                    } catch (_: Exception) {}
+                }
             } catch (e: Exception) { appendLog("[!] Shizuku probe failed: ${e.message}") }
         }
         val logPrefix = mutableState.value.log
