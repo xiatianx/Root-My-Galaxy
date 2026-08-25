@@ -7,7 +7,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import org.json.JSONObject
 
 data class VerifiedPayloads(
     val profile: TargetProfile,
@@ -16,13 +15,14 @@ data class VerifiedPayloads(
 )
 
 class PayloadRepository(private val context: Context) {
+    
     fun loadTargets(): List<TargetProfile> {
-        val commit = resolveMainCommit()
-        val manifestBytes = downloadBytes(rawUrl(commit, "support/targets-v3.json"), MAX_MANIFEST_BYTES)
-        return SupportManifest.parse(manifestBytes).targets.map { profile -> profile.copy(
-            exploit = profile.exploit.copy(url = pinArtifactUrl(profile.exploit.url, commit)),
-            kernelSu = profile.kernelSu.copy(url = pinArtifactUrl(profile.kernelSu.url, commit)),
-        ) }
+        // 【魔改 1】：彻底移除 resolveMainCommit()，不再请求 GitHub API
+        // 直接从本地 assets 读取 JSON 列表
+        val manifestBytes = context.assets.open("targets-v3.json").readBytes()
+        
+        // 【魔改 2】：不再调用 pinArtifactUrl，直接使用 JSON 中配置的本地路径
+        return SupportManifest.parse(manifestBytes).targets
     }
 
     fun resolveTarget(snapshot: DeviceSnapshot): TargetProfile = loadTargets()
@@ -37,18 +37,21 @@ class PayloadRepository(private val context: Context) {
         val directory = File(context.filesDir, "payloads/${profile.profileId}").apply { mkdirs() }
         val exploit = downloadArtifact(
             profile.exploit,
-            File(directory, "cve-2026-43499-app.so"),
+            //File(directory, "cve-2026-43499-app.so"),
+            File(directory, profile.exploit.url.substringAfterLast('/')),   // payload/cve-2026-43499 → cve-2026-43499
             context.getString(R.string.artifact_exploit),
             onProgress,
         )
         val kernelSu = downloadArtifact(
             profile.kernelSu,
-            File(directory, "ksud-s25u-kdp"),
+            //File(directory, "ksud-s25u-kdp"),
+            File(directory, profile.kernelSu.url.substringAfterLast('/')),  // → ksud-dm3q-S9
             context.getString(R.string.artifact_kernelsu),
             onProgress,
         )
-        Os.chmod(exploit.absolutePath, 0b100100100)
-        Os.chmod(kernelSu.absolutePath, 0b100100100)
+        // 赋予 0755 权限
+        Os.chmod(exploit.absolutePath, 0b111101101) // 八进制 0755 的十进制表示是 493，这里用二进制 0b111101101 或 493
+        Os.chmod(kernelSu.absolutePath, 0b111101101) 
         return VerifiedPayloads(profile, exploit, kernelSu)
     }
 
@@ -60,6 +63,25 @@ class PayloadRepository(private val context: Context) {
     ): File {
         onProgress(context.getString(R.string.repo_downloading, label))
         val temporary = File(destination.parentFile, "${destination.name}.part")
+        
+        // 【核心魔改 3】：本地 Assets 拦截器
+        // 如果 JSON 里的 url 不是以 http 开头，说明是我们放在 assets 里的本地文件
+        if (!artifact.url.startsWith("http")) {
+            context.assets.open(artifact.url).use { input ->
+                FileOutputStream(temporary).use { output ->
+                    input.copyTo(output)
+                    output.fd.sync()
+                }
+            }
+            if (destination.exists()) destination.delete()
+            require(temporary.renameTo(destination)) {
+                context.getString(R.string.repo_finalize_failed, label)
+            }
+            onProgress(context.getString(R.string.repo_verified, label))
+            return destination
+        }
+
+        // 原有的网络下载逻辑（保留作为备用，以防 JSON 里写了 http 链接）
         val connection = open(artifact.url)
         require(connection.contentLengthLong == -1L || connection.contentLengthLong == artifact.size) {
             context.getString(R.string.repo_size_mismatch, label)
@@ -90,41 +112,6 @@ class PayloadRepository(private val context: Context) {
         return destination
     }
 
-    private fun resolveMainCommit(): String {
-        val response = downloadBytes(COMMIT_API_URL, MAX_COMMIT_RESPONSE_BYTES)
-        val commit = JSONObject(response.toString(Charsets.UTF_8))
-            .getJSONObject("object")
-            .getString("sha")
-        require(commit.matches(Regex("[0-9a-f]{40}"))) { context.getString(R.string.repo_commit_invalid) }
-        return commit
-    }
-
-    private fun rawUrl(commit: String, path: String) = "$RAW_REPOSITORY/$commit/$path"
-
-    private fun pinArtifactUrl(url: String, commit: String): String {
-        require(url.startsWith(MUTABLE_RAW_PREFIX)) { context.getString(R.string.repo_url_invalid) }
-        return "$RAW_REPOSITORY/$commit/${url.removePrefix(MUTABLE_RAW_PREFIX)}"
-    }
-
-    private fun downloadBytes(url: String, maximum: Int): ByteArray {
-        val connection = open(url)
-        val bytes = connection.inputStream.use { input ->
-            val output = ByteArrayOutputStream()
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                require(output.size() + count <= maximum) {
-                    context.getString(R.string.repo_response_too_large)
-                }
-                output.write(buffer, 0, count)
-            }
-            output.toByteArray()
-        }
-        connection.disconnect()
-        return bytes
-    }
-
     private fun open(url: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
@@ -136,12 +123,6 @@ class PayloadRepository(private val context: Context) {
         }
 
     companion object {
-        private const val COMMIT_API_URL =
-            "https://api.github.com/repos/BuSung-dev/Root-My-Galaxy-Payloads/git/ref/heads/main"
-        private const val RAW_REPOSITORY =
-            "https://raw.githubusercontent.com/BuSung-dev/Root-My-Galaxy-Payloads"
-        private const val MUTABLE_RAW_PREFIX = "$RAW_REPOSITORY/main/"
-        private const val MAX_COMMIT_RESPONSE_BYTES = 16 * 1024
         private const val MAX_MANIFEST_BYTES = 256 * 1024
     }
 }

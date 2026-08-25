@@ -15,6 +15,8 @@ data class TargetProfile(
     val kernelVersions: Set<String>,
     val exploit: RemoteArtifact,
     val kernelSu: RemoteArtifact,
+    val exploitAttempts: Int = 24,
+    val pselectDelayUsec: Int = 20000, // 新增 delay
 ) {
     init {
         require(models.isNotEmpty()) { "Payload must support at least one model" }
@@ -57,6 +59,8 @@ data class SupportManifest(
                             profileId = payload.getString("payloadId"),
                             displayName = payload.getString("displayName"),
                             models = payload.getJSONArray("models").strings(),
+                            exploitAttempts = payload.optInt("exploitAttempts", 24),
+                            pselectDelayUsec = payload.optInt("pselectDelayUsec", 20000),
                             kernelVersions = payload.getJSONArray("kernelVersions").strings(),
                             exploit = RemoteArtifact(
                                 url = exploit.getString("url"),
