@@ -195,11 +195,11 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 appendLog(app.getString(R.string.log_download_verified))
 
                 setPhase(InstallPhase.Exploiting, app.getString(R.string.status_exploit_running))
-                executeExploit(payloads.exploit, payloads.profile.exploitAttempts.toString(),payloads.profile.pselectDelayUsec.toString())
+                executeExploit(payloads.exploit)
 
                 setPhase(InstallPhase.LoadingKernelSu, app.getString(R.string.status_ksu_loading))
                 installKernelSu(payloads)
-installKsuManagerIfNeeded()
+
                 setPhase(InstallPhase.Installed, app.getString(R.string.status_ksu_active))
                 appendLog(app.getString(R.string.log_install_complete))
                 finishHistory(InstallRunResult.Succeeded)
@@ -213,15 +213,11 @@ installKsuManagerIfNeeded()
         }
     }
 
-    private suspend fun executeExploit(payload: File, attempts: String = EXPLOIT_ATTEMPTS, pselectDelay: String = "20000") {
+    private suspend fun executeExploit(payload: File) {
         val shizuku = shizukuEnabled()
         val logFile = if (shizuku) File(SHIZUKU_LOG_PATH) else File(app.filesDir, "exploit.log")
         if (shizuku) {
             ShizukuController.exec(arrayOf("rm", "-f", SHIZUKU_LOG_PATH)).waitFor()
-    // 清除上次 panic/重启留下的零字节尸体，防 bad ELF magic
-    ShizukuController.exec(arrayOf("/system/bin/sh", "-c",
-        "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $GRKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
-    )).waitFor()
         } else {
             logFile.delete()
         }
@@ -229,52 +225,13 @@ installKsuManagerIfNeeded()
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
-        val bootToken = currentBootToken()
-        // ★ 新增:独立预热步骤,注意【没有】第二个 env 参数 → 干净环境,只热缓存不触发 payload
-        if (shizuku) {
-            appendLog("[*] warmup 400x /system/bin/true")
-            ShizukuController.exec(
-                arrayOf("/system/bin/sh", "-c",
-                    "i=0; while [ \$i -lt 400 ]; do /system/bin/true; i=\$((\$i+1)); done")
-            ).waitFor()
-            // 调试：Shizuku 域探针
-            try {
-                val slabProc = ShizukuController.exec(arrayOf("cat", "/proc/slabinfo"))
-                val slabBuf = StringBuilder()
-                while (slabProc.isAlive) { drainProcessOutput(slabProc, slabBuf); delay(50) }
-                drainProcessOutput(slabProc, slabBuf)
-                val slabText = slabBuf.toString()
-                val mmLine = slabText.lines().firstOrNull { it.contains("mm_struct") } ?: "mm_struct not found"
-                appendLog("[*] Shizuku slabinfo: $mmLine")
-                val bootProc = ShizukuController.exec(arrayOf("cat", "/proc/sys/kernel/random/boot_id"))
-                val bootBuf = StringBuilder()
-                while (bootProc.isAlive) { drainProcessOutput(bootProc, bootBuf); delay(50) }
-                drainProcessOutput(bootProc, bootBuf)
-                appendLog("[*] Shizuku boot_id: ${bootBuf.toString().trim().take(80)}")
-                appendLog("[*] Shizuku helper staged: $SHIZUKU_HELPER_PATH / $SHIZUKU_PAYLOAD_PATH")
-                // 额外探针：ashmem/tracefs/perf/bpf
-                for (probe in listOf(
-                    arrayOf("ls", "-l", "/dev/ashmem"),
-                    arrayOf("cat", "/proc/self/mountinfo"),
-                    arrayOf("ls", "-l", "/sys/kernel/tracing/tracing_on")
-                )) {
-                    try {
-                        val p = ShizukuController.exec(probe)
-                        val b = StringBuilder()
-                        while (p.isAlive) { drainProcessOutput(p, b); delay(50) }
-                        drainProcessOutput(p, b)
-                        appendLog("[*] Shizuku ${probe.joinToString(" ")}: ${b.toString().trim().take(120)}")
-                    } catch (_: Exception) {}
-                }
-            } catch (e: Exception) { appendLog("[!] Shizuku probe failed: ${e.message}") }
-        }
         val logPrefix = mutableState.value.log
+        val bootToken = currentBootToken()
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
-            val stagedHelper = shizukuStage(helper, SHIZUKU_HELPER_PATH, "755")
             ShizukuController.exec(
-                arrayOf("/system/bin/true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, stagedHelper.absolutePath, attempts, pselectDelay),
+                arrayOf("/system/bin/sh", "-c", "true"),
+                shizukuEnvironment(bootToken, stagedPayload.absolutePath, helper.absolutePath),
             )
         } else {
             val processBuilder = ProcessBuilder(
@@ -285,9 +242,7 @@ installKsuManagerIfNeeded()
                 logFile.absolutePath,
             ).redirectErrorStream(true)
             processBuilder.environment().apply {
-                // 传递 attempts 和 pselectDelay 
-                put("EXPLOIT_ATTEMPTS", attempts)
-                put("PSELECT_DELAY_USEC", pselectDelay)
+                put("EXPLOIT_ATTEMPTS", EXPLOIT_ATTEMPTS)
                 put("P0_ATTEMPT_TIMEOUT_SEC", P0_ATTEMPT_TIMEOUT_SEC)
                 put("EXPLOIT_ATTEMPT_TIMEOUT_SEC", EXPLOIT_ATTEMPT_TIMEOUT_SEC)
                 cachedP0Offset(bootToken)?.let { put(P0_OFFSET_ENV, it) }
@@ -340,8 +295,7 @@ installKsuManagerIfNeeded()
                     earlyOutput.takeIf(String::isNotBlank)?.let { " ($it)" } ?: "",
                 )
             }
-            //require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
-            require(rawLog.contains("exploit completed") || rawLog.contains("temporary-root-ready")) {
+            require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
                 app.getString(R.string.error_success_marker)
             }
         } finally {
@@ -386,15 +340,13 @@ installKsuManagerIfNeeded()
         if (shizukuEnabled()) {
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_PATH, "755")
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_STAGE_PATH, "755")
-            shizukuStage(payloads.kernelSu, GRKU_KSUD_PATH, "755")      // ★ 新增
             appendLog(app.getString(R.string.log_ksu_staged))
         } else {
             val source = shellQuote(payloads.kernelSu.absolutePath)
             val stageCommand =
                 "/system/bin/cp $source $SHIZUKU_KSUD_PATH && " +
                     "/system/bin/cp $source $SHIZUKU_KSUD_STAGE_PATH && " +
-                    "/system/bin/cp $source $GRKU_KSUD_PATH && " +
-                    "/system/bin/chmod 755 $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH $GRKU_KSUD_PATH"
+                    "/system/bin/chmod 755 $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
             val stage = runHelper("-c", stageCommand)
             require(stage.code == 0) { app.getString(R.string.error_ksu_stage, stage.output) }
             appendLog(app.getString(R.string.log_ksu_staged))
@@ -486,11 +438,8 @@ installKsuManagerIfNeeded()
         bootToken: String?,
         payloadPath: String,
         helperPath: String,
-		attempts: String = EXPLOIT_ATTEMPTS,
-		pselectDelay: String = "20000"
     ): Array<String> = buildList {
-        add("EXPLOIT_ATTEMPTS=$attempts")
-		add("PSELECT_DELAY_USEC=$pselectDelay") // 新增
+        add("EXPLOIT_ATTEMPTS=$EXPLOIT_ATTEMPTS")
         add("P0_ATTEMPT_TIMEOUT_SEC=$P0_ATTEMPT_TIMEOUT_SEC")
         add("EXPLOIT_ATTEMPT_TIMEOUT_SEC=$EXPLOIT_ATTEMPT_TIMEOUT_SEC")
         add("CVE43499_ROOT_HELPER=$helperPath")
@@ -594,65 +543,11 @@ installKsuManagerIfNeeded()
 
     private fun File.readTextIfPresent(): String = if (exists()) readText() else ""
 
-	// 1. 检测是否已安装 KSU Manager
-private fun isKsuManagerInstalled(): Boolean {
-    return try {
-        // 注意：如果老白改了包名，把这里换成他的包名
-        app.packageManager.getPackageInfo("me.weishu.kernelsu", 0)
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-// 2. 通过 Shizuku 静默安装 APK
-private suspend fun installKsuManagerIfNeeded() {
-    if (isKsuManagerInstalled()) {
-        appendLog("[*] KernelSU Manager already installed, skipping.")
-        return
-    }
-
-    appendLog("[*] Installing KernelSU Manager 3.2.5 via Shizuku...")
-    try {
-        val tmpApkPath = "/data/local/tmp/ksu-manager.apk"
-        
-        // Step A: 用 Shizuku 起一个 shell，通过 stdin 把 assets 里的 apk 写到 /data/local/tmp
-        // (因为 shell 用户读不到 App 的沙箱目录，必须用管道写)
-        val writeCmd = arrayOf("/system/bin/sh", "-c", "cat > $tmpApkPath")
-        val writeProcess = ShizukuController.exec(writeCmd)
-        
-        app.assets.open("payload/KernelSU_Manager_v3.2.5_32525.apk").use { input ->
-            writeProcess.outputStream.use { output ->
-                input.copyTo(output)
-            }
-        }
-        val writeExit = writeProcess.waitFor()
-        if (writeExit != 0) throw RuntimeException("Failed to write APK to tmp")
-
-        // Step B: 执行 pm install 静默安装
-        val installCmd = arrayOf("/system/bin/sh", "-c", "pm install -r $tmpApkPath")
-        val installProcess = ShizukuController.exec(installCmd)
-        val installOutput = installProcess.inputStream.bufferedReader().readText()
-        val installExit = installProcess.waitFor()
-        
-        // Step C: 清理临时文件
-        ShizukuController.exec(arrayOf("/system/bin/sh", "-c", "rm -f $tmpApkPath")).waitFor()
-
-        if (installExit == 0 || installOutput.contains("Success")) {
-            appendLog("[+] KernelSU Manager installed successfully!")
-        } else {
-            appendLog("[-] pm install failed: $installOutput")
-        }
-    } catch (e: Exception) {
-        appendLog("[-] Failed to install KernelSU Manager: ${e.message}")
-    }
-}
-	
     companion object {
-        private const val EXPLOIT_ATTEMPTS = "6"
+        private const val EXPLOIT_ATTEMPTS = "24"
         private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
         private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
-        private const val EXPLOIT_STALL_MILLIS = 210_000L
+        private const val EXPLOIT_STALL_MILLIS = 90_000L
         private const val EXPLOIT_TOTAL_MILLIS = 900_000L
         private const val HELPER_TIMEOUT_MILLIS = 120_000L
         private const val INSTALL_RECEIPT = "install_receipt"
@@ -665,10 +560,9 @@ private suspend fun installKsuManagerIfNeeded() {
         private const val P0_OFFSET_MAX = 0x1f0000L
         private const val P0_OFFSET_MASK = 0xffffL
         private const val SHIZUKU_LOG_PATH = "/data/local/tmp/ksu-exploit.log"
-        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
-        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/cve-2026-43499"
+        private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/ksu-helper"
+        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/ksu-payload"
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
-        private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"   // ★ grku helper 硬编码找这个
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
         private val LOG_POLL_INTERVAL = 250.milliseconds
         private val HELPER_POLL_INTERVAL = 250.milliseconds
