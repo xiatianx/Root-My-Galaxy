@@ -238,6 +238,22 @@ installKsuManagerIfNeeded()
                 arrayOf("/system/bin/sh", "-c",
                     "i=0; while [ \$i -lt 400 ]; do /system/bin/true; i=\$((\$i+1)); done")
             ).waitFor()
+            // 调试：Shizuku 域探针
+            try {
+                val slabProc = ShizukuController.exec(arrayOf("cat", "/proc/slabinfo"))
+                val slabBuf = StringBuilder()
+                while (slabProc.isAlive) { drainProcessOutput(slabProc, slabBuf); delay(50) }
+                drainProcessOutput(slabProc, slabBuf)
+                val slabText = slabBuf.toString()
+                val mmLine = slabText.lines().firstOrNull { it.contains("mm_struct") } ?: "mm_struct not found"
+                appendLog("[*] Shizuku slabinfo: $mmLine")
+                val bootProc = ShizukuController.exec(arrayOf("cat", "/proc/sys/kernel/random/boot_id"))
+                val bootBuf = StringBuilder()
+                while (bootProc.isAlive) { drainProcessOutput(bootProc, bootBuf); delay(50) }
+                drainProcessOutput(bootProc, bootBuf)
+                appendLog("[*] Shizuku boot_id: ${bootBuf.toString().trim().take(80)}")
+                appendLog("[*] Shizuku helper staged: $SHIZUKU_HELPER_PATH / $SHIZUKU_PAYLOAD_PATH")
+            } catch (e: Exception) { appendLog("[!] Shizuku probe failed: ${e.message}") }
         }
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
