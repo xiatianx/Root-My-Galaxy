@@ -229,7 +229,6 @@ installKsuManagerIfNeeded()
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
-        val logPrefix = mutableState.value.log
         val bootToken = currentBootToken()
         // ★ 新增:独立预热步骤,注意【没有】第二个 env 参数 → 干净环境,只热缓存不触发 payload
         if (shizuku) {
@@ -255,6 +254,7 @@ installKsuManagerIfNeeded()
                 appendLog("[*] Shizuku helper staged: $SHIZUKU_HELPER_PATH / $SHIZUKU_PAYLOAD_PATH")
             } catch (e: Exception) { appendLog("[!] Shizuku probe failed: ${e.message}") }
         }
+        val logPrefix = mutableState.value.log
         val process = if (shizuku) {
             val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
             val stagedHelper = shizukuStage(helper, SHIZUKU_HELPER_PATH, "755")
