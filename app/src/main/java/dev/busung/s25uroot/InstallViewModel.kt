@@ -229,6 +229,22 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
+        if (shizuku) {
+            // 调试探针：对照 adb shell 域，定位 kernel-location-ready 卡点
+            for (probe in listOf(
+                arrayOf("/system/bin/sh", "-c", "id -Z; pwd"),
+                arrayOf("/system/bin/sh", "-c", "head -c 4 /sys/kernel/tracing/tracing_on; echo"),
+                arrayOf("/system/bin/sh", "-c", "timeout 2 head -c 64 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw >/dev/null; echo rp:\$?"),
+            )) {
+                try {
+                    val p = ShizukuController.exec(probe)
+                    val b = StringBuilder()
+                    while (p.isAlive) { drainProcessOutput(p, b); delay(50) }
+                    drainProcessOutput(p, b)
+                    appendLog("[probe/${probe[2].take(40)}] ${b.toString().trim().replace("\n", " | ").take(160)}")
+                } catch (e: Exception) { appendLog("[probe-fail] ${e.message}") }
+            }
+        }
         val logPrefix = mutableState.value.log
         val bootToken = currentBootToken()
         val process = if (shizuku) {
