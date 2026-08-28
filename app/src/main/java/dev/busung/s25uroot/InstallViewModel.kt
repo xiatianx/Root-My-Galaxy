@@ -229,30 +229,22 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
+        val bootToken = currentBootToken()
+        // ★ 先 stage 文件（写盘），再 warmup，完全复刻 donor 时序
+        val stagedPayload = if (shizuku) shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755") else null
+        val stagedHelper = if (shizuku) shizukuStage(helper, SHIZUKU_HELPER_PATH, "755") else null
         if (shizuku) {
-            // 调试探针：对照 adb shell 域，定位 kernel-location-ready 卡点
-            for (probe in listOf(
-                arrayOf("/system/bin/sh", "-c", "id -Z; pwd"),
-                arrayOf("/system/bin/sh", "-c", "head -c 4 /sys/kernel/tracing/tracing_on; echo"),
-                arrayOf("/system/bin/sh", "-c", "timeout 2 head -c 64 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw >/dev/null; echo rp:\$?"),
-            )) {
-                try {
-                    val p = ShizukuController.exec(probe)
-                    val b = StringBuilder()
-                    while (p.isAlive) { drainProcessOutput(p, b); delay(50) }
-                    drainProcessOutput(p, b)
-                    appendLog("[probe/${probe[2].take(40)}] ${b.toString().trim().replace("\n", " | ").take(160)}")
-                } catch (e: Exception) { appendLog("[probe-fail] ${e.message}") }
-            }
+            appendLog("[*] warmup 400x /system/bin/true")
+            ShizukuController.exec(
+                arrayOf("/system/bin/sh", "-c",
+                    "i=0; while [ \$i -lt 400 ]; do /system/bin/true; i=\$((\$i+1)); done")
+            ).waitFor()
         }
         val logPrefix = mutableState.value.log
-        val bootToken = currentBootToken()
         val process = if (shizuku) {
-            val stagedPayload = shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755")
-            val stagedHelper = shizukuStage(helper, SHIZUKU_HELPER_PATH, "755")
             ShizukuController.exec(
                 arrayOf("/system/bin/true"),
-                shizukuEnvironment(bootToken, stagedPayload.absolutePath, stagedHelper.absolutePath),
+                shizukuEnvironment(bootToken, stagedPayload!!.absolutePath, stagedHelper!!.absolutePath),
             )
         } else {
             val processBuilder = ProcessBuilder(
