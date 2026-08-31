@@ -9,7 +9,8 @@
       "exploitAttempts": 6,
       "pselectDelayUsec": 20000,
       "exploit":  { "url": "payload/cve-2026-43499", "size": 131072 },
-      "kernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
+      "kernelsu": { "url": "payload/ksud-gts9-X710XXS6EZF1-kdp", "size": 4783256 },
+      "grkuKernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
     }
   ]
 }
