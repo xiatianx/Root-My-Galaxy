@@ -6,11 +6,10 @@
       "displayName": "Galaxy Tab S9+ | Kernel 5.15.189",
       "models": ["SM-X810"],
       "kernelVersions": ["5.15.189"],
-      "exploitAttempts": 6,
+      "exploitAttempts": 1,
       "pselectDelayUsec": 20000,
-      "exploit":  { "url": "payload/cve-2026-43499", "size": 131072 },
-      "kernelsu": { "url": "payload/ksud-gts9-X710XXS6EZF1-kdp", "size": 4783256 },
-      "grkuKernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
+      "exploit":  { "url": "payload/cve-2026-43499-app.so", "size": 131520 },
+      "kernelsu": { "url": "payload/ksud-gts9-X710XXS6EZF1-kdp", "size": 4783256 }
     }
   ]
 }

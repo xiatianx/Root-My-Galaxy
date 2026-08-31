@@ -220,7 +220,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             ShizukuController.exec(arrayOf("rm", "-f", SHIZUKU_LOG_PATH)).waitFor()
             // 清零字节尸体
             ShizukuController.exec(arrayOf("/system/bin/sh", "-c",
-                "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $GRKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
+                "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
             )).waitFor()
         } else {
             logFile.delete()
@@ -230,20 +230,12 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
         val bootToken = currentBootToken()
-        // ★ 先 stage 文件（写盘），再 warmup，完全复刻 donor 时序
         val stagedPayload = if (shizuku) shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755") else null
         val stagedHelper = if (shizuku) shizukuStage(helper, SHIZUKU_HELPER_PATH, "755") else null
-        if (shizuku) {
-            appendLog("[*] warmup 400x /system/bin/true")
-            ShizukuController.exec(
-                arrayOf("/system/bin/sh", "-c",
-                    "i=0; while [ \$i -lt 400 ]; do /system/bin/true; i=\$((\$i+1)); done")
-            ).waitFor()
-        }
         val logPrefix = mutableState.value.log
         val process = if (shizuku) {
             ShizukuController.exec(
-                arrayOf("/system/bin/true"),
+                arrayOf("/system/bin/sh", "-c", "true"),
                 shizukuEnvironment(bootToken, stagedPayload!!.absolutePath, stagedHelper!!.absolutePath),
             )
         } else {
@@ -308,7 +300,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                     earlyOutput.takeIf(String::isNotBlank)?.let { " ($it)" } ?: "",
                 )
             }
-            require(rawLog.contains("exploit completed") && rawLog.contains("done=1 root=1")) {
+            require(rawLog.contains("uid=2000->0") || rawLog.contains("exploit completed")) {
                 app.getString(R.string.error_success_marker)
             }
         } finally {
@@ -353,7 +345,6 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         if (shizukuEnabled()) {
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_PATH, "755")
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_STAGE_PATH, "755")
-            payloads.grkuKernelSu?.let { shizukuStage(it, GRKU_KSUD_PATH, "755") }
             appendLog(app.getString(R.string.log_ksu_staged))
         } else {
             val source = shellQuote(payloads.kernelSu.absolutePath)
@@ -361,12 +352,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 "/system/bin/cp $source $SHIZUKU_KSUD_PATH && " +
                     "/system/bin/cp $source $SHIZUKU_KSUD_STAGE_PATH && " +
                     "/system/bin/chmod 755 $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
-            val grku = payloads.grkuKernelSu
-            val fullCommand = if (grku != null) {
-                val grkuSource = shellQuote(grku.absolutePath)
-                "$stageCommand && /system/bin/cp $grkuSource $GRKU_KSUD_PATH && /system/bin/chmod 755 $GRKU_KSUD_PATH"
-            } else stageCommand
-            val stage = runHelper("-c", fullCommand)
+            val stage = runHelper("-c", stageCommand)
             require(stage.code == 0) { app.getString(R.string.error_ksu_stage, stage.output) }
             appendLog(app.getString(R.string.log_ksu_staged))
         }
@@ -563,8 +549,8 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
     private fun File.readTextIfPresent(): String = if (exists()) readText() else ""
 
     companion object {
-        private const val EXPLOIT_ATTEMPTS = "6"
-        private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
+        private const val EXPLOIT_ATTEMPTS = "1"
+        private const val P0_ATTEMPT_TIMEOUT_SEC = "120"
         private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
         private const val EXPLOIT_STALL_MILLIS = 210_000L
         private const val EXPLOIT_TOTAL_MILLIS = 900_000L
@@ -580,9 +566,8 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         private const val P0_OFFSET_MASK = 0xffffL
         private const val SHIZUKU_LOG_PATH = "/data/local/tmp/ksu-exploit.log"
         private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
-        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/cve-2026-43499"
+        private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/cve-2026-43499-app.so"
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
-        private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
         private val LOG_POLL_INTERVAL = 250.milliseconds
         private val HELPER_POLL_INTERVAL = 250.milliseconds
