@@ -12,6 +12,7 @@ data class VerifiedPayloads(
     val profile: TargetProfile,
     val exploit: File,
     val kernelSu: File,
+    val grkuKernelSu: File? = null,
 )
 
 class PayloadRepository(private val context: Context) {
@@ -49,10 +50,19 @@ class PayloadRepository(private val context: Context) {
             context.getString(R.string.artifact_kernelsu),
             onProgress,
         )
+        val grkuKernelSu = profile.grkuKernelSu?.let {
+            downloadArtifact(
+                it,
+                File(directory, it.url.substringAfterLast('/')),
+                context.getString(R.string.artifact_kernelsu),
+                onProgress,
+            )
+        }
         // 赋予 0755 权限
         Os.chmod(exploit.absolutePath, 0b111101101) // 八进制 0755 的十进制表示是 493，这里用二进制 0b111101101 或 493
-        Os.chmod(kernelSu.absolutePath, 0b111101101) 
-        return VerifiedPayloads(profile, exploit, kernelSu)
+        Os.chmod(kernelSu.absolutePath, 0b111101101)
+        grkuKernelSu?.let { Os.chmod(it.absolutePath, 0b111101101) }
+        return VerifiedPayloads(profile, exploit, kernelSu, grkuKernelSu)
     }
 
     private fun downloadArtifact(

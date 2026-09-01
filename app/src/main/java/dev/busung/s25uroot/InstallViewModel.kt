@@ -345,6 +345,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         if (shizukuEnabled()) {
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_PATH, "755")
             shizukuStage(payloads.kernelSu, SHIZUKU_KSUD_STAGE_PATH, "755")
+            payloads.grkuKernelSu?.let { shizukuStage(it, GRKU_KSUD_PATH, "755") }
             appendLog(app.getString(R.string.log_ksu_staged))
         } else {
             val source = shellQuote(payloads.kernelSu.absolutePath)
@@ -352,7 +353,12 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 "/system/bin/cp $source $SHIZUKU_KSUD_PATH && " +
                     "/system/bin/cp $source $SHIZUKU_KSUD_STAGE_PATH && " +
                     "/system/bin/chmod 755 $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
-            val stage = runHelper("-c", stageCommand)
+            val grku = payloads.grkuKernelSu
+            val fullCommand = if (grku != null) {
+                val grkuSource = shellQuote(grku.absolutePath)
+                "$stageCommand && /system/bin/cp $grkuSource $GRKU_KSUD_PATH && /system/bin/chmod 755 $GRKU_KSUD_PATH"
+            } else stageCommand
+            val stage = runHelper("-c", fullCommand)
             require(stage.code == 0) { app.getString(R.string.error_ksu_stage, stage.output) }
             appendLog(app.getString(R.string.log_ksu_staged))
         }
@@ -568,6 +574,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         private const val SHIZUKU_HELPER_PATH = "/data/local/tmp/cve-2026-43499-root"
         private const val SHIZUKU_PAYLOAD_PATH = "/data/local/tmp/cve-2026-43499-app.so"
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
+        private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
         private val LOG_POLL_INTERVAL = 250.milliseconds
         private val HELPER_POLL_INTERVAL = 250.milliseconds
