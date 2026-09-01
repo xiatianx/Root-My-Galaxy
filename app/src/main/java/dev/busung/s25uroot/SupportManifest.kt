@@ -15,7 +15,7 @@ data class TargetProfile(
     val kernelVersions: Set<String>,
     val exploit: RemoteArtifact,
     val kernelSu: RemoteArtifact,
-    val grkuKernelSu: RemoteArtifact? = null, // GRKU 路线 ksud（helper 硬编码 ksud-selected）
+    val helper: RemoteArtifact? = null, // root helper（路线专属；缺省回退 jniLibs 自带 lib）
     val exploitAttempts: Int = 24,
     val pselectDelayUsec: Int = 20000, // 新增 delay
 ) {
@@ -71,7 +71,7 @@ data class SupportManifest(
                                 url = kernelSu.getString("url"),
                                 size = kernelSu.getLong("size"),
                             ),
-                            grkuKernelSu = payload.optJSONObject("grkuKernelsu")?.let {
+                            helper = payload.optJSONObject("helper")?.let {
                                 RemoteArtifact(
                                     url = it.getString("url"),
                                     size = it.getLong("size"),

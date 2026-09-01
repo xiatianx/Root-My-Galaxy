@@ -2,6 +2,7 @@ package dev.busung.s25uroot
 
 import android.app.Application
 import android.os.SystemClock
+import android.system.Os
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +89,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     @Volatile
     private var activeRunShizuku: Boolean? = null
+    private var currentHelperOverride: File? = null
     val state: StateFlow<InstallUiState> = mutableState.asStateFlow()
     val history: StateFlow<List<InstallHistoryEntry>> = mutableHistory.asStateFlow()
     val targetCatalog: StateFlow<TargetCatalogUiState> = mutableTargetCatalog.asStateFlow()
@@ -194,7 +196,9 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 val payloads = repository.download(profile) { appendLog("[*] $it") }
                 appendLog(app.getString(R.string.log_download_verified))
 
+                currentHelperOverride = payloads.helper
                 setPhase(InstallPhase.Exploiting, app.getString(R.string.status_exploit_running))
+                // helper 从 targets-v3.json per-payload 取（RMG/GRKU 路线不同）；缺省用 jniLibs 自带
                 executeExploit(payloads.exploit)
 
                 setPhase(InstallPhase.LoadingKernelSu, app.getString(R.string.status_ksu_loading))
@@ -220,17 +224,19 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             ShizukuController.exec(arrayOf("rm", "-f", SHIZUKU_LOG_PATH)).waitFor()
             // 清零字节尸体
             ShizukuController.exec(arrayOf("/system/bin/sh", "-c",
-                "rm -f $SHIZUKU_PAYLOAD_PATH $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
+                "rm -f $SHIZUKU_PAYLOAD_PATH /data/local/tmp/cve-2026-43499 $SHIZUKU_HELPER_PATH $SHIZUKU_KSUD_PATH $SHIZUKU_KSUD_STAGE_PATH"
             )).waitFor()
         } else {
             logFile.delete()
         }
-        val helper = helperFile()
+        val helper = effectiveHelperFile()
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
         val bootToken = currentBootToken()
-        val stagedPayload = if (shizuku) shizukuStage(payload, SHIZUKU_PAYLOAD_PATH, "755") else null
+        // payload 落盘路径用文件名决定（GRKU 自校验路径名必须叫 cve-2026-43499，RMG 叫 cve-2026-43499-app.so）
+        val payloadStagePath = "/data/local/tmp/${payload.name}"
+        val stagedPayload = if (shizuku) shizukuStage(payload, payloadStagePath, "755") else null
         val stagedHelper = if (shizuku) shizukuStage(helper, SHIZUKU_HELPER_PATH, "755") else null
         val logPrefix = mutableState.value.log
         val process = if (shizuku) {
@@ -427,6 +433,24 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             nativeHelperFile()
         }
 
+    // 拦截点：当前路线 helper（来自 targets-v3.json per-payload helper 字段），否则 jniLibs 自带
+    private fun effectiveHelperFile(): File {
+        val override = currentHelperOverride ?: return nativeHelperFile()
+        return if (shizukuEnabled()) shizukuStage(override, SHIZUKU_HELPER_PATH, "755")
+        else scpHelperFile(override)
+    }
+
+    // 非 Shizuku：把 assets/json 里的 helper 复制到 filesDir 并设为可执行
+    private fun scpHelperFile(source: File): File {
+        File(app.filesDir, "staging").mkdirs()
+        val copied = File(app.filesDir, "staging/cve-2026-43499-root")
+        source.inputStream().use { input -> copied.outputStream().use { output -> input.copyTo(output) } }
+        copied.setReadable(true)
+        copied.setWritable(false)
+        Os.chmod(copied.absolutePath, 0b111101101) // 0755
+        return copied
+    }
+
     private fun nativeHelperFile() = File(app.applicationInfo.nativeLibraryDir, "libcve43499root.so")
 
     private fun shizukuEnabled(): Boolean = activeRunShizuku ?: AppPreferences.shizukuMode(app)
@@ -466,7 +490,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
      * indefinitely.
      */
     private suspend fun runHelper(vararg arguments: String): CommandResult {
-        val helper = helperFile()
+        val helper = effectiveHelperFile()
         val process = if (shizukuEnabled()) {
             ShizukuController.exec(arrayOf(helper.absolutePath) + arguments)
         } else {
