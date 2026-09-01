@@ -21,8 +21,7 @@
       "pselectDelayUsec": 20000,
       "exploit":  { "url": "payload/cve-2026-43499", "size": 131072 },
       "helper":   { "url": "payload/cve-2026-43499-grku-root", "size": 23640 },
-      "kernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 },
-      "grkuKernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
+      "kernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
     }
   ]
 }
