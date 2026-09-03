@@ -211,24 +211,30 @@ GRKU 在 Shizuku 里**设计性不可用**，不是 bug。RMG 路线无此限制
 - 用户主用 RMG 路线（默认）
 - GRKU 路线保留作为 adb 手动操作的备选（`adb shell` 里直接跑，不用 Shizuku）
 
-## 十一、GRKU 逆向可行性（2026-09-03）
+## 十一、GRKU 逆向可行性（2026-09-03，已实锤）
 
-### 自校验确认
+### 自校验确认（二进制级实锤）
 payload strings：
 - `root_sha256` — 校验 helper SHA256
 - `payload_sha256` — 校验 payload 自身 SHA256
 - `EVP_DigestVerify` + `ED25519_verify` — ED25519 签名验证
 
-**双向校验**：patch payload → `payload_sha256` 变 → ED25519 签名失效 → helper 拒绝配合。
+**关键二进制证据**：X810 payload 里 `cmp w0,w0`（`6B00001F`）出现 **3 次**，`cmp w0,#1`（`7100001F`）出现 6 次。这正是 README-chc.md 记载的 **"签名校验已去除: 3 处 `cmp w0,#1 → cmp w0,w0` (0x6b00001f)"**。运行时校验点被二进制补丁阉掉（`cmp w0,#1` 永远相等 → 校验永远通过）。
 
-**结论**：GRKU 是闭源 + 签名保护的商业 payload，**逆向不可行**。
+**结论**：
+1. **运行时不校验自身签名**——donor 过程已把签名校验彻底 patch 掉（3 处 `cmp w0,#1 → cmp w0,w0` + `mov w0,#1;ret` 内联桩）。
+2. `ED25519_verify` 等字符串是**残留死代码**，不产生任何运行时约束。
+3. 我之前"ED25519 双向签名、逆向不可行"是**错的**——逆向 + 二进制补丁恰恰就是 donor 的标准做法（改符号偏移、去签名、打桩）。
+4. 由此推论：同理，**parent 进程检测（如果存在）理论上也能 patch**，但需先实锤 Shizuku 失败根因。
 
 ### 替代方案
-GRKU 只用 adb（不用 Shizuku）。一键脚本：
-```powershell
-pwsh D:\Users\X810\adb-Donor-S9180\run_grku_adb.ps1
-```
-脚本已写好在 `adb-Donor-S9180\run_grku_adb.ps1`，boot 后第一次成功率 ~50%，失败后必须重启。
+GRKU 只用 adb（不用 Shizuku）。一键脚本已在 `adb-Donor-S9180\run_grku_adb.ps1`，boot 后第一次成功率 ~50%，失败后必须重启。
+
+## 十二、技能可用性
+
+- `research`：已加载可用（后台 agent 读取一手资料、写 Markdown）
+- `diagnosing-bugs`：已加载可用（硬 bug 诊断循环：反馈环 → 复现最小化 → 假设排序 → 探针 → 修复回归）
+- `memauthority`（iasI777/memauthority）：**不需要启动**。该 skill 专门用于**内存取证/权限分析**（Windows/驱动层），与当前 Android exploit 调试、二进制 patch 分析无关。如果后续涉及 Windows 驱动、内核内存完整性校验，再考虑。
 
 ## 十、最终交付（2026-09-03）
 
