@@ -211,6 +211,25 @@ GRKU 在 Shizuku 里**设计性不可用**，不是 bug。RMG 路线无此限制
 - 用户主用 RMG 路线（默认）
 - GRKU 路线保留作为 adb 手动操作的备选（`adb shell` 里直接跑，不用 Shizuku）
 
+## 十一、GRKU 逆向可行性（2026-09-03）
+
+### 自校验确认
+payload strings：
+- `root_sha256` — 校验 helper SHA256
+- `payload_sha256` — 校验 payload 自身 SHA256
+- `EVP_DigestVerify` + `ED25519_verify` — ED25519 签名验证
+
+**双向校验**：patch payload → `payload_sha256` 变 → ED25519 签名失效 → helper 拒绝配合。
+
+**结论**：GRKU 是闭源 + 签名保护的商业 payload，**逆向不可行**。
+
+### 替代方案
+GRKU 只用 adb（不用 Shizuku）。一键脚本：
+```powershell
+pwsh D:\Users\X810\adb-Donor-S9180\run_grku_adb.ps1
+```
+脚本已写好在 `adb-Donor-S9180\run_grku_adb.ps1`，boot 后第一次成功率 ~50%，失败后必须重启。
+
 ## 十、最终交付（2026-09-03）
 
 ### 提交链
