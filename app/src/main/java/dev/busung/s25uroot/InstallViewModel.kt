@@ -89,6 +89,8 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
 
     @Volatile
     private var activeRunShizuku: Boolean? = null
+    @Volatile
+    private var lastFailedBootToken: String? = null
     private var currentHelperOverride: File? = null
     val state: StateFlow<InstallUiState> = mutableState.asStateFlow()
     val history: StateFlow<List<InstallHistoryEntry>> = mutableHistory.asStateFlow()
@@ -196,6 +198,12 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 val payloads = repository.download(profile) { appendLog("[*] $it") }
                 appendLog(app.getString(R.string.log_download_verified))
 
+                // 同 boot 内 exploit 失败后内核状态污染，重试不会成；直接拒绝
+                val bootToken = currentBootToken()
+                if (bootToken != null && bootToken == lastFailedBootToken) {
+                    error("本次开机已失败过，exploit 后内核状态被污染，重试不会成功。请重启设备后再试。")
+                }
+
                 currentHelperOverride = payloads.helper
                 setPhase(InstallPhase.Exploiting, app.getString(R.string.status_exploit_running))
                 // helper 从 targets-v3.json per-payload 取（RMG/GRKU 路线不同）；缺省用 jniLibs 自带
@@ -300,6 +308,8 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
             // this never blocks on a child still holding the pipe open.
             val earlyOutput = captured.toString().trim()
             require(exitCode == 0) {
+                // 记录失败 boot_id，同 boot 内不再允许重试（内核状态污染）
+                lastFailedBootToken = currentBootToken()
                 app.getString(
                     R.string.error_payload_exit,
                     exitCode,
@@ -307,6 +317,8 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
             require(rawLog.contains("uid=2000->0") || rawLog.contains("exploit completed")) {
+                // 记录失败 boot_id，同 boot 内不再允许重试（内核状态污染）
+                lastFailedBootToken = currentBootToken()
                 app.getString(R.string.error_success_marker)
             }
         } finally {
