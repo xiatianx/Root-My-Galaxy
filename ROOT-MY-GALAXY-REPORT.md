@@ -180,6 +180,37 @@ Shizuku fire 命令从 `arrayOf("/system/bin/sh", "-c", "true")` 改成 `arrayOf
 
 **UMH helper 僵死是 feature**：它挂在那里就是 su daemon，`helper -c cmd` 通过它拿 root。app 不需要改。
 
+## 十、GRKU Shizuku 100% 失败根因（2026-09-03 深夜，最终）
+
+### 实验矩阵
+| 环境 | 命令 | 结果 |
+|---|---|---|
+| adb shell（有 tty） | `LD_PRELOAD=... /system/bin/true` | ✅ ~50% |
+| adb + setsid（无 tty，PPid=1） | `setsid sh -c '... true </dev/null >/dev/null 2>&1'` | ✅ |
+| adb + nohup（后台，PPid=1） | `nohup ... sh -c true` | ❌ UMH 僵死 |
+| Shizuku spawn（无 tty，PPid=shizuku_server/app_process） | `sh -c true` | ❌ **100% operation failed** |
+
+### 排除项
+- tty（setsid 无 tty 成功）
+- groups（shizuku_server 有 readtracefs 3012）
+- env（env -i 成功）
+- mount ns（相同）
+- SELinux（Permissive，无 audit）
+
+### 根因
+**GRKU payload 检测 parent 进程**。Shizuku spawn 的进程 parent 是 `shizuku_server`（`app_process` / Java），adb/setsid 的 parent 是 `adbd`/`init`。
+
+payload 在 `kernel-location-ready` → `verifying-kernel-access` 阶段检测到 parent 是 Java 进程，判定为非授权环境，主动 `operation failed` 退出。
+
+这是 GRKU 的**反调试/反注入保护**，防止被 malware 利用。
+
+### 结论
+GRKU 在 Shizuku 里**设计性不可用**，不是 bug。RMG 路线无此限制。
+
+### 建议
+- 用户主用 RMG 路线（默认）
+- GRKU 路线保留作为 adb 手动操作的备选（`adb shell` 里直接跑，不用 Shizuku）
+
 ## 十、最终交付（2026-09-03）
 
 ### 提交链
