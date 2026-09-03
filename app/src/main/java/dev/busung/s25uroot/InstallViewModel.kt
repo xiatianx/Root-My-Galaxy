@@ -237,7 +237,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         } else {
             logFile.delete()
         }
-        val helper = effectiveHelperFile()
+val helper = effectiveHelperFile()
         if (!shizuku) {
             require(helper.canExecute()) { app.getString(R.string.error_helper_unavailable) }
         }
@@ -246,10 +246,11 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val payloadStagePath = "/data/local/tmp/${payload.name}"
         val stagedPayload = if (shizuku) shizukuStage(payload, payloadStagePath, "755") else null
         val stagedHelper = if (shizuku) shizukuStage(helper, SHIZUKU_HELPER_PATH, "755") else null
+        val stagedUnblocker = if (shizuku) shizukuStageFromAssets("unblocker", SHIZUKU_UNBLOCKER_PATH, "755") else null
         val logPrefix = mutableState.value.log
         val process = if (shizuku) {
             ShizukuController.exec(
-                arrayOf("/system/bin/true"),
+                arrayOf(stagedUnblocker!!.absolutePath),
                 shizukuEnvironment(bootToken, stagedPayload!!.absolutePath, stagedHelper!!.absolutePath),
             )
         } else {
@@ -478,6 +479,21 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         return staged
     }
 
+    private fun shizukuStageFromAssets(assetName: String, target: String, mode: String): File {
+        val staged = File(target)
+        try {
+            app.assets.open(assetName).use { input ->
+                ShizukuController.writeFile(target, mode, input)
+            }
+        } catch (error: Throwable) {
+            throw IllegalStateException(
+                app.getString(R.string.error_shizuku_stage, target, error.message.orEmpty()),
+                error,
+            )
+        }
+        return File(target)
+    }
+
     private fun shizukuEnvironment(
         bootToken: String?,
         payloadPath: String,
@@ -609,6 +625,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         private const val SHIZUKU_KSUD_PATH = "/data/local/tmp/ksud-s25u-kdp"
         private const val GRKU_KSUD_PATH = "/data/local/tmp/ksud-selected"
         private const val SHIZUKU_KSUD_STAGE_PATH = "/data/local/tmp/.ksud-stage"
+        private const val SHIZUKU_UNBLOCKER_PATH = "/data/local/tmp/unblocker"
         private val LOG_POLL_INTERVAL = 250.milliseconds
         private val HELPER_POLL_INTERVAL = 250.milliseconds
         private val SHIZUKU_LOG_POLL_INTERVAL = 1.seconds
