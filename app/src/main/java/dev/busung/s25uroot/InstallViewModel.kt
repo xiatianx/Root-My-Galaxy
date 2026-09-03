@@ -249,7 +249,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         val logPrefix = mutableState.value.log
         val process = if (shizuku) {
             ShizukuController.exec(
-                arrayOf("/system/bin/sh", "-c", "true"),
+                arrayOf("/system/bin/true"),
                 shizukuEnvironment(bootToken, stagedPayload!!.absolutePath, stagedHelper!!.absolutePath),
             )
         } else {
