@@ -16,8 +16,7 @@ data class TargetProfile(
     val exploit: RemoteArtifact,
     val kernelSu: RemoteArtifact,
     val helper: RemoteArtifact? = null, // root helper（路线专属；缺省回退 jniLibs 自带 lib）
-    val exploitAttempts: Int = 24,
-    val pselectDelayUsec: Int = 20000, // 新增 delay
+    val exploitAttempts: Int = 1, // 同 boot 内失败即污染内核，重试无效；v3.json 固定为 1
 ) {
     init {
         require(models.isNotEmpty()) { "Payload must support at least one model" }
@@ -60,8 +59,7 @@ data class SupportManifest(
                             profileId = payload.getString("payloadId"),
                             displayName = payload.getString("displayName"),
                             models = payload.getJSONArray("models").strings(),
-                            exploitAttempts = payload.optInt("exploitAttempts", 24),
-                            pselectDelayUsec = payload.optInt("pselectDelayUsec", 20000),
+                            exploitAttempts = payload.optInt("exploitAttempts", 1),
                             kernelVersions = payload.getJSONArray("kernelVersions").strings(),
                             exploit = RemoteArtifact(
                                 url = exploit.getString("url"),

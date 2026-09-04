@@ -436,13 +436,6 @@ val helper = effectiveHelperFile()
             .apply()
     }
 
-    private fun helperFile(): File =
-        if (shizukuEnabled()) {
-            shizukuStage(nativeHelperFile(), SHIZUKU_HELPER_PATH, "755")
-        } else {
-            nativeHelperFile()
-        }
-
     // 拦截点：当前路线 helper（来自 targets-v3.json per-payload helper 字段），否则 jniLibs 自带
     private fun effectiveHelperFile(): File {
         val override = currentHelperOverride ?: return nativeHelperFile()

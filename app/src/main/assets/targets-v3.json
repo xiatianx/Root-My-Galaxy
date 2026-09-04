@@ -7,7 +7,6 @@
       "models": ["SM-X810"],
       "kernelVersions": ["5.15.189"],
       "exploitAttempts": 1,
-      "pselectDelayUsec": 20000,
       "exploit":  { "url": "payload/cve-2026-43499-app.so", "size": 131520 },
       "helper":   { "url": "payload/cve-2026-43499-root", "size": 27232 },
       "kernelsu": { "url": "payload/ksud-gts9-X710XXS6EZF1-kdp", "size": 4783256 }
@@ -18,7 +17,6 @@
       "models": ["SM-X810"],
       "kernelVersions": ["5.15.189"],
       "exploitAttempts": 1,
-      "pselectDelayUsec": 20000,
       "exploit":  { "url": "payload/cve-2026-43499", "size": 131072 },
       "helper":   { "url": "payload/cve-2026-43499-grku-root", "size": 23640 },
       "kernelsu": { "url": "payload/ksud-samsung-android13-5.15-kdp", "size": 6756208 }
