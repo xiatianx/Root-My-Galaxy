@@ -300,4 +300,4 @@ GRKU 只用 adb（不用 Shizuku）。一键脚本已在 `adb-Donor-S9180\run_gr
 - 根目录放单个 `.c` 污染工程根；**不放** `app/src/main/cpp/`（该目录有 `CMakeLists.txt` + `externalNativeBuild` 接线，放进去有被 CMake 误收编风险）
 - 它由 CI shell 步骤（NDK clang 直调）编译、不走 Gradle——`tools/` 是 CI  helper 源码的常规位置
 - `build.yml` 4.5 步路径同步更新；`InstallViewModel` 引用的是 asset 名 `unblocker`（运行时），不受源码搬迁影响
-- CI 状态：待 Actions `4063ab2` 结果回填
+- CI 状态：`69b996a` ✅ success（搬迁后路径 + 合并后整树一次过编）
