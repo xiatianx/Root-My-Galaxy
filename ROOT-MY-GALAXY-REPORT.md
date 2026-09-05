@@ -268,3 +268,36 @@ GRKU 只用 adb（不用 Shizuku）。一键脚本已在 `adb-Donor-S9180\run_gr
 - 点火日志：`D:\Users\X810\FIRE-LOG.md`
 - fork：`https://github.com/xiatianx/Root-My-Galaxy`
 - APK：Actions → 最新 success run → `app-debug.apk`
+
+---
+
+## 十三、上游同步 + unblocker.c 搬迁（2026-09-06，commit `4063ab2`）
+
+### 上游增量核查（`1f2f062` → `upstream/main`，PR #567）
+先被端点 diff（`main..upstream/main`，22 文件）误导——逐项核对 merge-base 后确认，
+**上游真实增量只有德语本地化 4 文件、184 行**：
+| 文件 | 内容 |
+|---|---|
+| `MainActivity.kt` | +1 行：`LanguageOption(R.string.language_german, "de")` |
+| `res/values/strings.xml` | +1 行：`language_german = Deutsch` |
+| `res/xml/locales_config.xml` | +1 行：`<locale android:name="de" />` |
+| `res/values-de/strings.xml` | 新文件 181 行 |
+
+### 澄清：diff 里“上游删除”的文件其实全是我方的
+| 端点 diff 假象 | 真相（`git ls-tree 1f2f062`） |
+|---|---|
+| 上游删 `targets-v3.json` + 7 个 payload 二进制 | merge-base 下 `assets/` 为空——**全是我方后加的**（`03fefda`/`43d1435`），合并自动保留，零冲突 |
+| 上游删 `unblocker.c`、`ROOT-MY-GALAXY-REPORT.md` | 同上，我方独有，自动保留 |
+| 上游删 `build.yml`、改 Kotlin（去 helper/exploitAttempts/unblocker） | `build.yml` 在 base 里不存在（我方 `e75e407` 新增）；Kotlin“回退”全是我方特性，PR #567 **根本没碰**这 4 个文件 |
+| 上游新增 `ci.yml`/`release.yml` | 它们在 merge-base 里**已存在**，是我方 `54d90dc Drop release CI` 有意删的——合并时自动保持删除；曾手动取回又撤销（`ci.yml` 装 SDK35 + 无 unblocker 步骤，与 `compileSdk 37` + Shizuku 路径冲突，会编出坏包 + 双跑 CI） |
+
+### 合并结果（`4063ab2`，6 文件，零冲突）
+- 取入：德语 4 文件（上游原样）
+- 保留：双路线 json、per-payload helper、`EXPLOIT_ATTEMPTS=1` + boot-token 防重试、bundled assets、unblocker、`build.yml` 云编
+- 拒绝：`ci.yml`/`release.yml`（有意保持 `54d90dc` 删除决定）
+
+### unblocker.c 搬迁：根目录 → `tools/unblocker/unblocker.c`
+- 根目录放单个 `.c` 污染工程根；**不放** `app/src/main/cpp/`（该目录有 `CMakeLists.txt` + `externalNativeBuild` 接线，放进去有被 CMake 误收编风险）
+- 它由 CI shell 步骤（NDK clang 直调）编译、不走 Gradle——`tools/` 是 CI  helper 源码的常规位置
+- `build.yml` 4.5 步路径同步更新；`InstallViewModel` 引用的是 asset 名 `unblocker`（运行时），不受源码搬迁影响
+- CI 状态：待 Actions `4063ab2` 结果回填
