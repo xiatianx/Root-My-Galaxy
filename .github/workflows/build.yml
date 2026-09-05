@@ -33,7 +33,7 @@ jobs:
         run: |
           NDK_DIR=$(ls -d $ANDROID_HOME/ndk/* | head -1)
           CLANG=$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
-          $CLANG --target=aarch64-linux-android35 -static -O2 -s unblocker.c -o app/src/main/assets/unblocker
+          $CLANG --target=aarch64-linux-android35 -static -O2 -s tools/unblocker/unblocker.c -o app/src/main/assets/unblocker
           chmod 755 app/src/main/assets/unblocker
 
       - name: 5. 赋予 Gradle 执行权限
